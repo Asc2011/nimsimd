@@ -10,24 +10,32 @@ Each SIMD instruction set is in its own file for importing.
 
 ## x86
 
-Instruction Set | Bindings
---------- | :----:
-SSE       | ✅
-SSE2      | ✅
-SSE3      | ✅
-SSSE3     | ✅
-SSE4.1    | ✅
-SSE4.2    | ✅
-AVX       | ✅
-AVX2      | ✅
-PCLMULQDQ | ✅
-BMI1      | ✅
-BMI2      | ✅
-F16C      | ✅
-MOVBE     | ✅
-MOVBE     | ✅
-POPCNT    | ✅
-FMA       | ✅
+| Instruction Set | Support | Acronym Expansion & Reference |
+--------- |:--:|:----------------------------------------|
+MMX       |[NOPE](https://en.wikipedia.org/wiki/Legacy_system)| [Multi Media Extensions](https://en.wikipedia.org/wiki/MMX_(instruction_set)) a.k.a. _3DNow_
+SSE       | ✅ | [Streaming SIMD Extensions](https://en.wikipedia.org/wiki/Streaming_SIMD_Extensions)
+SSE2      | ✅ |
+SSE3      | ✅ |
+SSSE3     | ✅ |
+SSE4.1    | ✅ |
+SSE4.2    | ✅ |
+AVX       | ✅ | [Advanced Vector Extensions](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions) / __AVX1__
+AVX2      | ✅ |
+PCLMULQDQ | ✅ | [Carryless Multiplication](https://en.wikipedia.org/wiki/CLMUL_instruction_set) 
+BMI1      | ✅ | [Bit Manipulation Instruction Set(s)](https://en.wikipedia.org/wiki/X86_Bit_manipulation_instruction_set)
+BMI2      | ✅ | see also : ABM (Advanced Bit Manipulation)
+F16C      | ✅ | _Half-precision_ [Floating Point 16 Conversion](https://en.wikipedia.org/wiki/F16C)
+MOVBE     | ✅ | Move Big-Endian / byte-swap / [Endianness](https://en.wikipedia.org/wiki/Endianness)
+POPCNT    | ✅ | Pop-Count a.k.a. [Hamming Weight](https://en.wikipedia.org/wiki/Hamming_weight)
+FMA       | ✅ | [Fused-Multiply-Add](https://en.wikipedia.org/wiki/FMA_instruction_set) / __FMA3__
+FMA4      | [WIP](https://en.wikipedia.org/wiki/Work_in_process)| to come ...
+TSC       | ✅ | [Time Stamp Counter](https://en.wikipedia.org/wiki/Time_Stamp_Counter) see [further details at SO](https://stackoverflow.com/questions/13772567/how-to-get-the-cpu-cycle-count-in-x86-64-from-c/51907627#51907627)
+RDTSC     | ✅ | Read Time Stamp Counter
+AES       | ✅ | [Advanced Encryption Standard](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) [Instruction set](https://en.wikipedia.org/wiki/AES_instruction_set)
+RDRAND    | ✅ | [Read Random](https://en.wikipedia.org/wiki/RDRAND)
+CRC32     | ✅ | [Cyclic Redundancy Checks](https://en.wikipedia.org/wiki/Computation_of_cyclic_redundancy_checks#CRC-32_example)
+LZCNT     | ✅ | [Leading Zeros Count](https://en.wikipedia.org/wiki/Find_first_set) a.k.a _Find first set bit_
+[AVX512](https://en.wikipedia.org/wiki/AVX-512)  | [WIP](https://en.wikipedia.org/wiki/Work_in_process) | to come ...
 
 ### Compiler flags
 
