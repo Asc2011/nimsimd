@@ -10,24 +10,30 @@ Each SIMD instruction set is in its own file for importing.
 
 ## x86
 
-Instruction Set | Bindings
---------- | :----:
-SSE       | ✅
-SSE2      | ✅
-SSE3      | ✅
-SSSE3     | ✅
-SSE4.1    | ✅
-SSE4.2    | ✅
-AVX       | ✅
-AVX2      | ✅
-PCLMULQDQ | ✅
-BMI1      | ✅
-BMI2      | ✅
-F16C      | ✅
-MOVBE     | ✅
-MOVBE     | ✅
-POPCNT    | ✅
-FMA       | ✅
+Instruction Set | Bindings | Wiki
+--------- | :---|---------------
+SSE       | ✅ | [Streaming SIMD Extensions](https://en.wikipedia.org/wiki/Streaming_SIMD_Extensions)
+SSE2      | ✅ |
+SSE3      | ✅ |
+SSSE3     | ✅ |
+SSE4.1    | ✅ |
+SSE4.2    | ✅ |
+AVX       | ✅ | [Advanced Vector Extensions](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions) a.k.a _AVX1_
+AVX2      | ✅ | 
+PCLMULQDQ | ✅ | [Carryless Multiplication](https://en.wikipedia.org/wiki/CLMUL_instruction_set) 
+BMI1      | ✅ | [Bit Manipulation Instruction Set(s)](https://en.wikipedia.org/wiki/X86_Bit_manipulation_instruction_set)
+BMI2      | ✅ |
+F16C      | ✅ | _Half-precision_ [Floating Point 16 Conversion](https://en.wikipedia.org/wiki/F16C)
+MOVBE     | ✅ |
+POPCNT    | ✅ | Pop-Count a.k.a. [Hamming Weight](https://en.wikipedia.org/wiki/Hamming_weight)
+FMA       | ✅ | [Fused-Multiply-Add](https://en.wikipedia.org/wiki/FMA_instruction_set) a.k.a _FMA3_
+FMA4      | | 
+TSC       | ✅ | [Time Stamp Counter](https://en.wikipedia.org/wiki/Time_Stamp_Counter)
+RDTSC     | ✅ | Read Time Stamp Counter
+AES       | ✅ | [AES Instruction set](https://en.wikipedia.org/wiki/AES_instruction_set)
+RDRAND    | ✅ | [Read Random](https://en.wikipedia.org/wiki/RDRAND)
+CRC32     | ✅ | [Cyclic Redundancy Checks](https://en.wikipedia.org/wiki/Computation_of_cyclic_redundancy_checks#CRC-32_example)
+LZCNT     | ✅ | [Leading Zeros Count](https://en.wikipedia.org/wiki/Find_first_set) a.k.a _Find first set bit_
 
 ### Compiler flags
 
