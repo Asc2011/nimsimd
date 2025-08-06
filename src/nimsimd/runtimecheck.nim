@@ -574,10 +574,10 @@ when defined(amd64):
     copyMem( result[ 8 ].unsafeAddr, subC.unsafeAddr, 4 )
 
 #[ 
-  This inital request reads leaf-0/subLeaf-0 and leaf-0x800_0000/subLeaf-0.
+  This inital request reads leaf-0/subLeaf-0 and leaf-0x8000_0000/subLeaf-0.
   Leaf-0 returns the number of the highest-leaf that carries information about this cpu.
   Leaf-0x8000_0000 provides the number of the lowest leaf.
-  In addition to the limits, they contain the vendorString and the cpuBrandString.
+  In addition to the limits, they contain the `cpuVendorString()`.
   As a 'hello-msg', the infos are loaded at module-import-time.
   Both results are kept in global vars `Leaf0` and `Leaf8000`.
 ]#
