@@ -6,7 +6,7 @@ from std/unicode   import reversed, toLower
 from std/strutils  import join, split
 from std/bitops    import testBit, BitsRange, bitSliced, setBit
 
-when NimVersion == "2.2.4" :
+when NimMajor >= 2 :
   proc unsafeAddr[T]( o :T ) :ptr T = o.addr
 
 const 
@@ -119,6 +119,7 @@ template `.`*( l :Leaf, field :untyped, maskBits :openArray[int] ) :int32 =
 when defined(amd64):
   ## https://www.felixcloutier.com/x86/cpuid
   ## (cross-checking) https://docs.rs/iced-x86/latest/iced_x86/enum.CpuidFeature.html
+  ## finally, the source-of-truth https://gitlab.com/x86-cpuid.org/x86-cpuid-db/-/tree/tip/db?ref_type=heads
   
   # when defined(isAMD):
   #   type
@@ -258,7 +259,7 @@ when defined(amd64):
       WBNOINVD            # Write Back and Do Not Invalidate Cache
 
   
-  proc cpuid[T :SomeInteger](eaxIn :T, ecxIn :T = 0, initCall :bool = false ) :Leaf
+  proc cpuid[T :SomeInteger](eaxIn :T, subLeaf :T = 0, initCall :bool = false ) :Leaf
 
   proc cpuBrandString*()  :string
   proc cpuVendorString*() :string
@@ -389,9 +390,7 @@ when defined(amd64):
     InstructionSetCheckInfo( leaf: 13, register: 0, bit: 3, ecxInit: 1'i32 ), # XSAVES
 
     InstructionSetCheckInfo( leaf: 12, register: 0, bit: 0 ), # SGX1 ?hex?
-
     InstructionSetCheckInfo( leaf: 14, register: 1, bit: 4 ), # PTWRITE ?hex?
-
     InstructionSetCheckInfo( leaf: 25, register: 1, bit: 0 ), # AESKLE ?hex?
 
     InstructionSetCheckInfo( leaf: (0x80000001'i32).int, register: 2, bit:  5 ), # LZCNT
@@ -405,8 +404,8 @@ when defined(amd64):
     InstructionSetCheckInfo( leaf: (0x80000008'i32).int, register: 1, bit:  9 ), # WBNOINVD
   ]
 
-  proc cpuid[T :SomeInteger](eaxIn :T, ecxIn :T = 0, initCall :bool = false ) :Leaf =
-    let (a, c) = (eaxIn.int32, ecxIn.int32)
+  proc cpuid[T :SomeInteger](eaxIn :T, subLeaf :T = 0, initCall :bool = false ) :Leaf =
+    let (a, c) = (eaxIn.int32, subLeaf.int32)
 
     when defined(vcc):
 
@@ -425,31 +424,20 @@ when defined(amd64):
         [ eax,ebx,ecx,edx ].asLeaf
 
       if initCall :
-        # assert (c == 0) and (a in [0, 0x8000_0000'i32 ]), "initCall ?"
+        # assert (subLeaf == 0) and (eaxIn in [0, 0x8000_0000'i32 ]), "initCall ?"
         ( Leaf0, Leaf8000 ) = ( asmCall( 0,0 ), asmCall( 0x8000_0000'i32, 0 ) )
         # TODO : clear dynamic ApicID, always 0
         echo fmt"init max-{Leaf0.A} min-{Leaf8000.A}"
         return Leaf0
 
-      if  ( a == 0 ) and (c == 0) : return Leaf0
-      elif( a  > Leaf0.DDD ) : return
-      elif( a == 0x8000_0000'i32 ) and ( c == 0 ) : return Leaf8000
-      elif( a  < 0 ) and (a > Leaf8000.AAA) : return
+      if  ( eaxIn == 0 ) and (subLeaf == 0) : return Leaf0
+      elif( eaxIn  > Leaf0.D ) : return
+      elif( eaxIn == 0x8000_0000'i32 ) and ( subLeaf == 0 ) : return Leaf8000
+      elif( eaxIn  < 0 ) and (eaxIn > Leaf8000.A ) : return
  
-      echo "calling cpuid ", a, "  ", c, " init-", initCall
+      debugEcho fmt"calling cpuid({eaxIn=} {subLeaf=}) is {initCall=}"
       return asmCall( a,c )
 
-#[
-  proc msr*( c :int32 ) = 
-    echo "calling read-msr for ", c
-    var eax, ebx, ecx, edx :int32
-    asm """
-      rdmsr
-      :"=a"(`eax`), "=b"(`ebx`), "=c"(`ecx`), "=d"(`edx`)
-      :"c"(`c`)"""
-    echo "got :: ", [ eax, ebx, ecx, edx ]
-    # SEGFAULT: 11
-]#
 
   proc checkInstructionSets*(instructionSets: set[InstructionSet]) :bool =
     result = true
@@ -467,14 +455,10 @@ when defined(amd64):
 
 
   proc checkInstructionSet*(iSet :InstructionSet) :bool =
-
     let
       rec  = checkInfos[ iSet.ord ] 
       # leaf = cpuid( rec.leaf.int32, 0 )
-      leaf = cpuid( rec.leaf.int32, rec.ecxInit )
-
-    #echo iSet.ord, "  ", iSet
-    # echo "rec-info   :: ", rec
+      leaf = cpuid( rec.leaf, subLeaf=rec.ecxInit )
 
     #echo "leaf-infos :: ", leaf, fmt" | b-bits {leaf[2]:.b}"
     # echo "leaf-infos :: ", leaf, fmt" | b-bits {leaf[ rec.register ]:.b}"
@@ -486,7 +470,7 @@ when defined(amd64):
       ] ] =
     # L2-CacheInfo in ECX
     # let 
-    #   regsL2 = cpuid( 0x80000006'i32, 0'i32 )
+    #   regsL2 = cpuid( 0x8000_0006'i32, subLeaf=0 )
     #   cl = ( regsL2[2].uint32 and 255'u32 ).int
     #   assoc = (( regsL2[2].uint32 shr 12 ) and 0x07'u32 ).int
     #   kbyte = ( regsL2[2].uint32 shr 16 ).int
@@ -499,7 +483,7 @@ when defined(amd64):
     # unique ID for each logical-processor via leaf-11
     let resp0 = cpuid(11)
     # echo " eBx != 0 ? ", resp0.B != 0
-    #echo cpuid(1'i32, 0)
+    #echo 1.cpuid 0
     # CPUID.(EAX=11, ECX=n):EAX[4:0] 
     #echo "a,b,c,d ", resp0
     # echo " id ? ", resp0.A 4..0
@@ -514,7 +498,7 @@ when defined(amd64):
       leaf :Leaf
       turn :int32
 
-    while( leaf = 4.cpuid( turn ); leaf.A != 0 ) :
+    while( leaf = 4.cpuid( subLeaf=turn ); leaf.A != 0 ) :
       turn.inc
       let 
         cType      = ["none", "Data", "Instruction", "Unified"][ leaf.A 4..0 ]
@@ -532,13 +516,12 @@ when defined(amd64):
       result.add ( cType, cMapping, cInclusive, cLevel, cLine, cSize, (not leaf.D.testBit 2) )
 
 
-
   proc cpuSignature*() : ( tuple[
       maxApicId, CLSize, cpuType,
       familyId, extFamilyId, brandIndex,
       model, extModelId, steppingId :int
     ], int ) = 
-      let leaf = 1.cpuid 0
+      let leaf = 1.cpuid subLeaf=0
       var info = result[ 0 ]
       info.extFamilyId = leaf.A 27..20
       info.extModelId  = leaf.A 19..16
@@ -554,10 +537,10 @@ when defined(amd64):
         if info.familyId == 15 :
           info.familyId += info.extModelId
 
-      if leaf.DDD.testBit 28 : # supports HyperThreading ?
+      if leaf.D.testBit 28 : # supports HyperThreading ?
         info.maxApicId = leaf.B 23..16
 
-      if leaf.DDD.testBit 19 : # CLFlush ?
+      if leaf.D.testBit 19 : # CLFlush ?
         info.CLSize = 8 * leaf.B 15..8
 
       ## dynamic ApicId (= responding thread/core)
@@ -569,9 +552,9 @@ when defined(amd64):
 
     result.setLen 48
     let
-      leaf2 = 0x8000_0002'i32.cpuid 0
-      leaf3 = 0x8000_0003'i32.cpuid 0
-      leaf4 = 0x8000_0004'i32.cpuid 0
+      leaf2 = 0x8000_0002'i32.cpuid subLeaf=0
+      leaf3 = 0x8000_0003'i32.cpuid subLeaf=0
+      leaf4 = 0x8000_0004'i32.cpuid subLeaf=0
 
     copyMem( result[  0 ].unsafeAddr, leaf2.unsafeAddr, 16 )
     copyMem( result[ 16 ].unsafeAddr, leaf3.unsafeAddr, 16 )
@@ -584,11 +567,18 @@ when defined(amd64):
     #
     result.setLen 12
 
-    let leaf0 = 0.cpuid 0
-    let ( subB, subD, subC ) = ( leaf0.BBB, leaf0.DDD, leaf0.CCC )
+    let leaf0 = 0.cpuid subLeaf=0
+    let ( subB, subD, subC ) = ( leaf0.B, leaf0.D, leaf0.C )
     copyMem( result[ 0 ].unsafeAddr, subB.unsafeAddr, 4 )
     copyMem( result[ 4 ].unsafeAddr, subD.unsafeAddr, 4 )
     copyMem( result[ 8 ].unsafeAddr, subC.unsafeAddr, 4 )
 
-
-once : discard 0.cpuid( 0, true )
+#[ 
+  This inital request reads leaf-0/subLeaf-0 and leaf-0x800_0000/subLeaf-0.
+  Leaf-0 returns the number of the highest-leaf that carries information about this cpu.
+  Leaf-0x8000_0000 provides the number of the lowest leaf.
+  In addition to the limits, they contain the vendorString and the cpuBrandString.
+  As a 'hello-msg', the infos are loaded at module-import-time.
+  Both results are kept in global vars `Leaf0` and `Leaf8000`.
+]#
+once : discard 0.cpuid( 0, initCall=true )
