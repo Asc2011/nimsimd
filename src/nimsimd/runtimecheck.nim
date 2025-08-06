@@ -123,15 +123,16 @@ when defined(amd64):
   ## finally, the source-of-truth https://gitlab.com/x86-cpuid.org/x86-cpuid-db/-/tree/tip/db?ref_type=heads
 
   #[ TODO
-    reduce the list of Instruction-Sets, to what is relevant for SIMD-operations :
+    - reduce the list of Instruction-Sets, to what is relevant for SIMD-operations.
     - plus features alike Time-Stamp-Counter for code-measurements.
-    - use the well-maintained CpuId-database from X86-cpuid.org. Its XML, ok be it.
+    - use/sync the well-maintained CpuId-database from X86-cpuid.org. Its XML, ok be it.
     - maybe include some/all compiler-switches for GCC/CLang/MVS/ICC/et al and
-      integrate them into NimSIMD ? !very! user-friendly and a nightmare to maintain.
+      integrate them into NimSIMD ? !very! user-friendly and a true nightmare to maintain.
     - maybe perform the cpu-feature-tests at module-import (compile-time) ?
       Tested with a minimal cpuid-binary -> works -> produces concise and easy understandable error-msgs.
     - put more stuff in /examples. Have AES-Hash, CRC32, TSP and some 
-      data-structures like vectorized Set, Cache etc.
+      data-structures like vectorized Bit-Set, Cache etc.
+    - add some tests..
     -> this prepares for the AVX512-family of SIMD to come - it looks huge...
   ]#
 
