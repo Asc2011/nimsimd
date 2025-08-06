@@ -10,6 +10,7 @@ when NimMajor >= 2 :
   proc unsafeAddr[T]( o :T ) :ptr T = o.addr
 
 const 
+  # fullPath-info during debug.
   fp :bool = when defined(debug) :true else :false
   NL = '\n'
 
@@ -30,6 +31,7 @@ var
     "leftmost", "left", "right", "rightmost" # 2d-thinkers
     # ... this is public & writable ...
   ]
+
 type 
   II = tuple[ filename :string; line, column :int ]
   UArr[T] = UncheckedArray[T] 
@@ -50,7 +52,7 @@ func `[]`*[ T :SomeInteger ](i :T, ft :HSlice[int,int]) :int =
   i.bitSliced start.int .. fin.int
 
 proc toMask( arr :varargs[int] ) :int32 = 
-  for pos in arr : result.setBit pos
+  for pos in arr : result.setBit pos  # bitOps.setBit tests for `pos is in BitsRange[int32]`
 
 proc asLeaf*( arr :array[4, int32] ) :Leaf = 
   cast[ptr Leaf]( arr.unsafeAddr )[]
@@ -107,7 +109,7 @@ template `.`*( l :Leaf, field :untyped, fromTo :HSlice[int, int] ) :int =
   if idx == -1 : errorMsg( instantiationInfo( fullPaths=fp ), label )
   leaf[ idx mod 4 ][ fromTo ]
 
-# (4) Leaf.label> seq[int] -> int32 AND-masked with indices from array.
+# (4) Leaf.<label> seq[int] -> int32 AND-masked with indices from array.
 #
 template `.`*( l :Leaf, field :untyped, maskBits :openArray[int] ) :int32 = 
   let (label, idx) = getIdx astToStr field
@@ -115,22 +117,24 @@ template `.`*( l :Leaf, field :untyped, maskBits :openArray[int] ) :int32 =
   leaf[ idx mod 4 ] and toMask( maskBits )
 
 
-
 when defined(amd64):
   ## https://www.felixcloutier.com/x86/cpuid
   ## (cross-checking) https://docs.rs/iced-x86/latest/iced_x86/enum.CpuidFeature.html
   ## finally, the source-of-truth https://gitlab.com/x86-cpuid.org/x86-cpuid-db/-/tree/tip/db?ref_type=heads
-  
-  # when defined(isAMD):
-  #   type
-  #     InstructionSet* = enum
-  #       LWP
-  #       XOP
-  #       FMA4
-  #       D3NOW
-  #       D3NOWEXT
-  #       RDPRU
-  # else :
+
+  #[ TODO
+    reduce the list of Instruction-Sets, to what is relevant for SIMD-operations :
+    - plus features alike Time-Stamp-Counter for code-measurements.
+    - use the well-maintained CpuId-database from X86-cpuid.org. Its XML, ok be it.
+    - maybe include some/all compiler-switches for GCC/CLang/MVS/ICC/et al and
+      integrate them into NimSIMD ? !very! user-friendly and a nightmare to maintain.
+    - maybe perform the cpu-feature-tests at module-import (compile-time) ?
+      Tested with a minimal cpuid-binary -> works -> produces concise and easy understandable error-msgs.
+    - put more stuff in /examples. Have AES-Hash, CRC32, TSP and some 
+      data-structures like vectorized Set, Cache etc.
+    -> this prepares for the AVX512-family of SIMD to come - it looks huge...
+  ]#
+
   type
     InstructionSet* = enum
       SSE3
@@ -258,18 +262,20 @@ when defined(amd64):
       X64                 # arch X64
       WBNOINVD            # Write Back and Do Not Invalidate Cache
 
-  
+  # TODO the default param could break Nim < 2 ?
   proc cpuid[T :SomeInteger](eaxIn :T, subLeaf :T = 0, initCall :bool = false ) :Leaf
 
   proc cpuBrandString*()  :string
   proc cpuVendorString*() :string
 
+  # cache for Leaf(0, 0) and Leaf(0x8000_0000, 0)
+  # read once at module-import.
   var Leaf0*, Leaf8000* :Leaf
 
   type
     InstructionSetCheckInfo* = object
       leaf*, register*, bit*: int
-      ecxInit* :int32 #= 0 # TODO breaks 1.6.10
+      ecxInit* :int32 # = 0 # TODO this breaks 1.6.10
 
 
   const checkInfos* = [
@@ -408,10 +414,10 @@ when defined(amd64):
     let (a, c) = (eaxIn.int32, subLeaf.int32)
 
     when defined(vcc):
-
+      # TODO: better return a `Leaf` here. needs testing.
       proc cpuid(cpuInfo: ptr int32, functionId, subFunctionId: int32)
         {.cdecl, importc: "__cpuidex", header: "intrin.h".}
-      cpuid(cast[ptr int32](result.addr), eaxi, ecxi)
+      cpuid( cast[ptr Leaf](result.unsafeAddr), a, c )
 
     else :
 
@@ -426,7 +432,6 @@ when defined(amd64):
       if initCall :
         # assert (subLeaf == 0) and (eaxIn in [0, 0x8000_0000'i32 ]), "initCall ?"
         ( Leaf0, Leaf8000 ) = ( asmCall( 0,0 ), asmCall( 0x8000_0000'i32, 0 ) )
-        # TODO : clear dynamic ApicID, always 0
         echo fmt"init max-{Leaf0.A} min-{Leaf8000.A}"
         return Leaf0
 
@@ -468,14 +473,21 @@ when defined(amd64):
   proc cacheInfo*() :seq[ tuple[ 
       ct, mapping, inclusive :string, level, CL, cacheSizeKB :int, invalidates :bool 
       ] ] =
-    # L2-CacheInfo in ECX
+    #
+    # TODO: needs logic to choose the proper CacheInfo-procedure. 
+    # Three methods are possible. 
+    #
+    # method-1 :: L2-CacheInfo via Leaf-0x8000_0006 in ECX.
+    #
     # let 
     #   regsL2 = cpuid( 0x8000_0006'i32, subLeaf=0 )
     #   cl = ( regsL2[2].uint32 and 255'u32 ).int
     #   assoc = (( regsL2[2].uint32 shr 12 ) and 0x07'u32 ).int
     #   kbyte = ( regsL2[2].uint32 shr 16 ).int
     # return ( bytes, kbyte, assoc )
-  
+
+    # method-2 :: full-info, all cache-levels via Leaf-11
+    #
     let hasLeaf11 = cpuid(11).B != 0
     echo "maxLeaf is ", Leaf0.D, ". Is leaf-11 supported ? ", hasLeaf11
     echo "test 0_0 <- eBx != 0 ? ", cpuid(0).B != 0
@@ -521,7 +533,9 @@ when defined(amd64):
       familyId, extFamilyId, brandIndex,
       model, extModelId, steppingId :int
     ], int ) = 
+
       let leaf = 1.cpuid subLeaf=0
+
       var info = result[ 0 ]
       info.extFamilyId = leaf.A 27..20
       info.extModelId  = leaf.A 19..16
@@ -544,7 +558,7 @@ when defined(amd64):
         info.CLSize = 8 * leaf.B 15..8
 
       ## dynamic ApicId (= responding thread/core)
-      result[1] = leaf.B 31..24  # dynamic ! might change with every call !
+      result[1] = leaf.B 31..24  # dynamic value, might change with every call !
       result[0] = info
 
 
@@ -574,11 +588,11 @@ when defined(amd64):
     copyMem( result[ 8 ].unsafeAddr, subC.unsafeAddr, 4 )
 
 #[ 
-  This inital request reads leaf-0/subLeaf-0 and leaf-0x8000_0000/subLeaf-0.
-  Leaf-0 returns the number of the highest-leaf that carries information about this cpu.
-  Leaf-0x8000_0000 provides the number of the lowest leaf.
-  In addition to the limits, they contain the `cpuVendorString()`.
+  This inital request reads leaf(0,subLeaf-0) and leaf(0x8000_0000,subLeaf-0).
+  Leaf-0 holds the number of the highest-leaf that carries information about this Cpu.
+  Leaf-0x8000_0000 provides the number of the lowest-leaf.
+  In addition to these limits, Leaf0 contains the `cpuVendorString()`.
   As a 'hello-msg', the infos are loaded at module-import-time.
-  Both results are kept in global vars `Leaf0` and `Leaf8000`.
+  Both results are kept/cached in global vars `Leaf0` and `Leaf8000`.
 ]#
 once : discard 0.cpuid( 0, initCall=true )
