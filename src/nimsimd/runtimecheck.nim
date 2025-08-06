@@ -132,7 +132,7 @@ when defined(amd64):
       Tested with a minimal cpuid-binary -> works -> produces concise and easy understandable error-msgs.
     - put more stuff in /examples. Have AES-Hash, CRC32, TSP and some 
       data-structures like vectorized Bit-Set, Cache etc.
-    - add some tests..
+    - add some tests and include my float16.nim/bfloat16.nim stuff
     -> this prepares for the AVX512-family of SIMD to come - it looks huge...
   ]#
 
