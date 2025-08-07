@@ -1,10 +1,15 @@
 {.experimental: "dotOperators".}
-{.experimental : "codeReordering".}
+{.experimental: "codeReordering".}
+
+#{.passC: "-I ./../whichCompiler.h".}
 
 from std/strformat import fmt
 from std/unicode   import reversed, toLower
 from std/strutils  import join, split
-from std/bitops    import testBit, BitsRange, bitSliced, setBit
+
+import ./ct.nim
+
+echo "compiler is :: ", ct.version()
 
 when NimMajor >= 2 :
   proc unsafeAddr[T]( o :T ) :ptr T = o.addr
@@ -12,7 +17,6 @@ when NimMajor >= 2 :
 const 
   # fullPath-info during debug.
   fp :bool = when defined(debug) :true else :false
-  NL = '\n'
 
   CommonLabel = [                      
     "a",   "b",   "c",   "d",   # for the purists
@@ -27,10 +31,25 @@ var
     "first", "second", "third",  "fourth",   # quick-on-the-keys
     "apple", "banana", "citron", "date",     # Frutarians
     "atilla", "babe",  "candy",  "dolly",    # pr0n-fans
+    "ass",    "bitch", "cunt",   "dick",     # spicy tourette terms
     "abram",  "bar",   "chai",   "dana",     # Jews
     "leftmost", "left", "right", "rightmost" # 2d-thinkers
     # ... this is public & writable ...
   ]
+
+
+when (NimMajor, NimMinor) < (1,3) :
+  template typeMasked[ T :SomeInteger](x :T) :T = x
+  func bitsliced*[T :SomeInteger](v :T; slice :Slice[int]) :T =
+    let
+      upmost = sizeof(T) * 8 - 1
+      uv     = v.uint32
+    ((uv shl (upmost - slice.b)).typeMasked shr (upmost - slice.b + slice.a)).T
+else :
+  from std/bitops import bitSliced
+
+from std/bitops import testBit, BitsRange, setBit
+
 
 type 
   II = tuple[ filename :string; line, column :int ]
@@ -40,6 +59,7 @@ type
 proc errorMsg( ii :II, ident :string ) {.noReturn.} = 
   let msg = fmt"Unknown register-label '{ident}' ? "
   quit msg & fmt"{ii.fileName} [{ii.line}, {ii.column}]"
+
 
 func `[]`*(  l :Leaf, i :int )  :int32   = 
   cast[ ptr UArr[int32] ]( l.unsafeAddr )[i]
@@ -61,6 +81,7 @@ proc asLeaf*[T :SomeInteger]( arr :openArray[T] ) :Leaf =
     result[i] = arr[i].int32
 
 when defined( debug ): 
+  let NL = '\n'
   proc `$`*( l :Leaf ) :string = 
     let pt = cast[ptr UArr[uint8]]( l.unsafeAddr )
     var bits :array[ 4, seq[string] ]
@@ -441,8 +462,13 @@ when defined(amd64):
       elif( eaxIn == 0x8000_0000'i32 ) and ( subLeaf == 0 ) : return Leaf8000
       elif( eaxIn  < 0 ) and (eaxIn > Leaf8000.A ) : return
  
-      debugEcho fmt"calling cpuid({eaxIn=} {subLeaf=}) is {initCall=}"
+      debugEcho fmt"calling cpuid( eaxIn=", eaxIn, " subLeaf=", subLeaf,") is {initCall=}"
       return asmCall( a,c )
+
+
+  
+  proc cpuid(i :SomeInteger) :Leaf = cpuid( i.int, 0 )
+
 
 
   proc checkInstructionSets*(instructionSets: set[InstructionSet]) :bool =
@@ -535,7 +561,7 @@ when defined(amd64):
       model, extModelId, steppingId :int
     ], int ) = 
 
-      let leaf = 1.cpuid subLeaf=0
+      let leaf = 1.cpuid( subleaf=0 )
 
       var info = result[ 0 ]
       info.extFamilyId = leaf.A 27..20
@@ -567,9 +593,9 @@ when defined(amd64):
 
     result.setLen 48
     let
-      leaf2 = 0x8000_0002'i32.cpuid subLeaf=0
-      leaf3 = 0x8000_0003'i32.cpuid subLeaf=0
-      leaf4 = 0x8000_0004'i32.cpuid subLeaf=0
+      leaf2 = 0x8000_0002'i32.cpuid 0
+      leaf3 = 0x8000_0003'i32.cpuid 0
+      leaf4 = 0x8000_0004'i32.cpuid 0
 
     copyMem( result[  0 ].unsafeAddr, leaf2.unsafeAddr, 16 )
     copyMem( result[ 16 ].unsafeAddr, leaf3.unsafeAddr, 16 )
@@ -582,7 +608,7 @@ when defined(amd64):
     #
     result.setLen 12
 
-    let leaf0 = 0.cpuid subLeaf=0
+    let leaf0 = cpuid(0,0)
     let ( subB, subD, subC ) = ( leaf0.B, leaf0.D, leaf0.C )
     copyMem( result[ 0 ].unsafeAddr, subB.unsafeAddr, 4 )
     copyMem( result[ 4 ].unsafeAddr, subD.unsafeAddr, 4 )
